@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduStream - Modern Online Learning Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .dark {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+        }
+        
+        .light {
+            --bg-primary: #f8f9fa;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6c757d;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            transition: all 0.3s ease;
+        }
+
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(400px); }
+            to { transform: translateX(0); }
+        }
+
+        canvas {
+            border-radius: 8px;
+        }
+
+        .validation-error {
+            border-color: #ef4444 !important;
+        }
+
+        .validation-success {
+            border-color: #10b981 !important;
+        }
+    </style>
+</head>
+<body class="light">
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <!-- Navigation -->
+    <nav class="card shadow-lg p-4 mb-6">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-graduation-cap text-3xl text-blue-600"></i>
+                <h1 class="text-2xl font-bold">EduStream</h1>
+            </div>
+            <div class="flex items-center space-x-6">
+                <button onclick="showSection('courses')" class="hover:text-blue-600 transition">
+                    <i class="fas fa-book"></i> Courses
+                </button>
+                <button onclick="showSection('dashboard')" class="hover:text-blue-600 transition">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </button>
+                <button onclick="toggleCart()" class="relative hover:text-blue-600 transition">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span id="cartBadge" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">0</span>
+                </button>
+                <button onclick="toggleDarkMode()" class="hover:text-blue-600 transition">
+                    <i id="themeIcon" class="fas fa-moon"></i>
+                </button>
+                <button id="authButton" onclick="toggleAuth()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    Login
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4">
+        <!-- Authentication Modal -->
+        <div id="authModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="card p-8 rounded-lg max-w-md w-full mx-4 fade-in">
+                <h2 class="text-2xl font-bold mb-6">Login to EduStream</h2>
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="mb-4">
+                        <label class="block mb-2">Email</label>
+                        <input type="email" id="loginEmail" required 
+                               pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                               class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                               placeholder="your@email.com">
+                        <span class="text-red-500 text-sm hidden" id="emailError"></span>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block mb-2">Password</label>
+                        <input type="password" id="loginPassword" required 
+                               minlength="8"
+                               class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                               placeholder="••••••••">
+                        <span class="text-red-500 text-sm hidden" id="passwordError"></span>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
+                        Login
+                    </button>
+                    <button type="button" onclick="toggleAuth()" class="w-full mt-3 text-gray-500 hover:text-gray-700">
+                        Cancel
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Shopping Cart Modal -->
+        <div id="cartModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="card p-8 rounded-lg max-w-2xl w-full mx-4 fade-in max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Shopping Cart</h2>
+                    <button onclick="toggleCart()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                <div id="cartItems" class="space-y-4 mb-6"></div>
+                <div class="border-t pt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xl font-bold">Total:</span>
+                        <span id="cartTotal" class="text-2xl font-bold text-blue-600">$0</span>
+                    </div>
+                    <button onclick="checkout()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-lock"></i> Secure Checkout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Courses Section -->
+        <div id="coursesSection" class="section">
+            <h2 class="text-3xl font-bold mb-6">Available Courses</h2>
+            
+            <!-- Media Gallery -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="card rounded-lg overflow-hidden shadow-lg fade-in">
+                    <div class="video-container">
+                        <video id="video1" class="w-full" poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225'%3E%3Crect fill='%234f46e5' width='400' height='225'/%3E%3Ctext fill='white' font-size='24' font-family='Arial' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EWeb Development%3C/text%3E%3C/svg%3E">
+                            <source src="#" type="video/mp4">
+                        </video>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold mb-2">Complete Web Development</h3>
+                        <p class="text-gray-500 mb-4">Master HTML, CSS, JavaScript, and modern frameworks</p>
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-2xl font-bold text-blue-600">$49.99</span>
+                            <span class="text-sm text-gray-500">
+                                <i class="fas fa-star text-yellow-400"></i> 4.8 (1.2k)
+                            </span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="playMedia('video1')" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-play"></i> Preview
+                            </button>
+                            <button onclick="addToCart('Complete Web Development', 49.99)" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card rounded-lg overflow-hidden shadow-lg fade-in">
+                    <canvas id="courseCanvas1" width="400" height="225" class="w-full cursor-pointer" onclick="showCourseVisualization(1)"></canvas>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold mb-2">Data Science with Python</h3>
+                        <p class="text-gray-500 mb-4">Learn data analysis, visualization, and machine learning</p>
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-2xl font-bold text-blue-600">$79.99</span>
+                            <span class="text-sm text-gray-500">
+                                <i class="fas fa-star text-yellow-400"></i> 4.9 (2.1k)
+                            </span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="playAudio('audio1')" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-headphones"></i> Listen
+                            </button>
+                            <button onclick="addToCart('Data Science with Python', 79.99)" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card rounded-lg overflow-hidden shadow-lg fade-in">
+                    <canvas id="courseCanvas2" width="400" height="225" class="w-full cursor-pointer" onclick="showCourseVisualization(2)"></canvas>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold mb-2">Mobile App Development</h3>
+                        <p class="text-gray-500 mb-4">Build iOS and Android apps with React Native</p>
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-2xl font-bold text-blue-600">$59.99</span>
+                            <span class="text-sm text-gray-500">
+                                <i class="fas fa-star text-yellow-400"></i> 4.7 (890)
+                            </span>
+                        </div>
+                        <button onclick="addToCart('Mobile App Development', 59.99)" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-cart-plus"></i> Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Player -->
+            <audio id="audio1" class="hidden"></audio>
+
+            <!-- Course Enrollment Form -->
+            <div class="card rounded-lg p-6 mb-8 fade-in">
+                <h3 class="text-2xl font-bold mb-4">Quick Enrollment Form</h3>
+                <form id="enrollmentForm" onsubmit="handleEnrollment(event)">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block mb-2">Full Name *</label>
+                            <input type="text" id="enrollName" required 
+                                   minlength="3"
+                                   class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                   placeholder="John Doe">
+                            <span class="text-sm text-gray-500">Minimum 3 characters</span>
+                        </div>
+                        <div>
+                            <label class="block mb-2">Email *</label>
+                            <input type="email" id="enrollEmail" required 
+                                   pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                                   class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                   placeholder="john@example.com">
+                        </div>
+                        <div>
+                            <label class="block mb-2">Phone *</label>
+                            <input type="tel" id="enrollPhone" required 
+                                   pattern="[0-9]{10}"
+                                   class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                   placeholder="1234567890">
+                            <span class="text-sm text-gray-500">10 digits only</span>
+                        </div>
+                        <div>
+                            <label class="block mb-2">Select Course *</label>
+                            <select id="enrollCourse" required 
+                                    class="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+                                <option value="">Choose a course</option>
+                                <option value="web">Complete Web Development</option>
+                                <option value="data">Data Science with Python</option>
+                                <option value="mobile">Mobile App Development</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                        Enroll Now
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="section hidden">
+            <h2 class="text-3xl font-bold mb-6">My Learning Dashboard</h2>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="card rounded-lg p-6 fade-in">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 mb-2">Courses Enrolled</p>
+                            <p class="text-3xl font-bold">5</p>
+                        </div>
+                        <i class="fas fa-book text-4xl text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="card rounded-lg p-6 fade-in">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 mb-2">Completed</p>
+                            <p class="text-3xl font-bold">3</p>
+                        </div>
+                        <i class="fas fa-check-circle text-4xl text-green-600"></i>
+                    </div>
+                </div>
+                <div class="card rounded-lg p-6 fade-in">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 mb-2">Hours Learned</p>
+                            <p class="text-3xl font-bold">127</p>
+                        </div>
+                        <i class="fas fa-clock text-4xl text-yellow-600"></i>
+                    </div>
+                </div>
+                <div class="card rounded-lg p-6 fade-in">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 mb-2">Certificates</p>
+                            <p class="text-3xl font-bold">3</p>
+                        </div>
+                        <i class="fas fa-certificate text-4xl text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="card rounded-lg p-6 fade-in">
+                    <h3 class="text-xl font-bold mb-4">Course Progress</h3>
+                    <canvas id="progressChart" width="400" height="300"></canvas>
+                </div>
+                <div class="card rounded-lg p-6 fade-in">
+                    <h3 class="text-xl font-bold mb-4">Learning Activity</h3>
+                    <canvas id="activityChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Courses -->
+            <div class="card rounded-lg p-6 fade-in">
+                <h3 class="text-xl font-bold mb-4">Continue Learning</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-4">
+                            <i class="fas fa-code text-3xl text-blue-600"></i>
+                            <div>
+                                <h4 class="font-bold">Complete Web Development</h4>
+                                <p class="text-sm text-gray-500">Last accessed 2 hours ago</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500">Progress</p>
+                                <p class="font-bold">75%</p>
+                            </div>
+                            <svg class="progress-ring" width="60" height="60">
+                                <circle class="progress-ring-circle" stroke="#e5e7eb" stroke-width="4" fill="transparent" r="26" cx="30" cy="30"/>
+                                <circle class="progress-ring-circle" stroke="#3b82f6" stroke-width="4" fill="transparent" r="26" cx="30" cy="30" stroke-dasharray="163.36" stroke-dashoffset="40.84"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-4">
+                            <i class="fas fa-chart-bar text-3xl text-green-600"></i>
+                            <div>
+                                <h4 class="font-bold">Data Science with Python</h4>
+                                <p class="text-sm text-gray-500">Last accessed yesterday</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500">Progress</p>
+                                <p class="font-bold">45%</p>
+                            </div>
+                            <svg class="progress-ring" width="60" height="60">
+                                <circle class="progress-ring-circle" stroke="#e5e7eb" stroke-width="4" fill="transparent" r="26" cx="30" cy="30"/>
+                                <circle class="progress-ring-circle" stroke="#10b981" stroke-width="4" fill="transparent" r="26" cx="30" cy="30" stroke-dasharray="163.36" stroke-dashoffset="89.85"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Management
+        const appState = {
+            user: null,
+            cart: [],
+            theme: 'light',
+            isAuthenticated: false
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUserPreferences();
+            initializeCanvasVisualizations();
+            initializeCharts();
+            setupFormValidation();
+        });
+
+        // Theme Management
+        function toggleDarkMode() {
+            appState.theme = appState.theme === 'light' ? 'dark' : 'light';
+            document.body.classList.toggle('dark');
+            document.body.classList.toggle('light');
+            document.getElementById('themeIcon').className = appState.theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+            saveUserPreferences();
+            showNotification('Theme changed to ' + appState.theme + ' mode');
+        }
+
+        function saveUserPreferences() {
+            const prefs = {
+                theme: appState.theme,
+                cart: appState.cart
+            };
+            // Simulating localStorage - in real app would use localStorage
+            sessionStorage.setItem('edustream_prefs', JSON.stringify(prefs));
+        }
+
+        function loadUserPreferences() {
+            const prefs = sessionStorage.getItem('edustream_prefs');
+            if (prefs) {
+                const parsed = JSON.parse(prefs);
+                if (parsed.theme === 'dark') {
+                    toggleDarkMode();
+                }
+                appState.cart = parsed.cart || [];
+                updateCartBadge();
+            }
+        }
+
+        // Authentication
+        function toggleAuth() {
+            const modal = document.getElementById('authModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            // Simulate JWT authentication
+            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' + btoa(email);
+            
+            appState.user = { email, token };
+            appState.isAuthenticated = true;
+            
+            document.getElementById('authButton').textContent = 'Logout';
+            document.getElementById('authButton').onclick = handleLogout;
+            
+            toggleAuth();
+            showNotification('Successfully logged in!', 'success');
+            showSection('dashboard');
+        }
+
+        function handleLogout() {
+            appState.user = null;
+            appState.isAuthenticated = false;
+            document.getElementById('authButton').textContent = 'Login';
+            document.getElementById('authButton').onclick = toggleAuth;
+            showNotification('Logged out successfully');
+            showSection('courses');
+        }
+
+        // Shopping Cart
+        function toggleCart() {
+            const modal = document.getElementById('cartModal');
+            modal.classList.toggle('hidden');
+            renderCart();
+        }
+
+        function addToCart(name, price) {
+            if (!appState.isAuthenticated) {
+                showNotification('Please login to add items to cart', 'warning');
+                toggleAuth();
+                return;
+            }
+
+            const existingItem = appState.cart.find(item => item.name === name);
+            if (existingItem) {
+                showNotification('Course already in cart', 'warning');
+                return;
+            }
+
+            appState.cart.push({ name, price, id: Date.now() });
+            updateCartBadge();
+            saveUserPreferences();
+            showNotification('Added to cart!', 'success');
+        }
+
+        function removeFromCart(id) {
+            appState.cart = appState.cart.filter(item => item.id !== id);
+            updateCartBadge();
+            saveUserPreferences();
+            renderCart();
+            showNotification('Removed from cart');
+        }
+
+        function updateCartBadge() {
+            document.getElementById('cartBadge').textContent = appState.cart.length;
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('cartTotal');
+            
+            if (appState.cart.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">Your cart is empty</p>';
+                totalEl.textContent = '$0';
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = appState.cart.map(item => {
+                total += item.price;
+                return `
+                    <div class="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div>
+                            <h4 class="font-bold">${item.name}</h4>
+                            <p class="text-blue-600 font-bold">$${item.price}</p>
+                        </div>
+                        <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+            totalEl.textContent = '$' + total.toFixed(2);
+        }
+
+        function checkout() {
+            if (appState.cart.length === 0) {
+                showNotification('Cart is empty', 'warning');
+                return;
+            }
+
+            // Simulate secure payment processing
+            showNotification('Processing secure payment...', 'info');
+            
+            setTimeout(() => {
+                appState.cart = [];
+                updateCartBadge();
+                saveUserPreferences();
+                renderCart();
+                showNotification('Payment successful! Enrollment confirmed.', 'success');
+                toggleCart();
+            }, 2000);
+        }
+
+        // Media Playback
+        function playMedia(videoId) {
+            const video = document.getElementById(videoId);
+            if (video.paused) {
+                video.play();
+                showNotification('Playing course preview');
+            } else {
+                video.pause();
+            }
+        }
+
+        function playAudio(audioId) {
+            const audio = document.getElementById(audioId);
+            // Simulate audio playback
+            showNotification('Playing audio lecture...', 'info');
+        }
+
+        // Canvas Visualizations
+        function initializeCanvasVisualizations() {
+            drawCoursePreview('courseCanvas1', '#8b5cf6', 'Data Science');
+            drawCoursePreview('courseCanvas2', '#06b6d4', 'Mobile Dev');
+        }
+
+        function drawCoursePreview(canvasId, color, text) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 400, 225);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, color + '80');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 400, 225);
+            
+            // Text
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, 200, 100);
+            
+            // Animated elements
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(50 + i * 80, 150, 10 + i * 3, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function showCourseVisualization(courseNum) {
+            showNotification('Interactive course visualization', 'info');
+        }
+
+        // Charts
+        function initializeCharts() {
+            drawProgressChart();
+            drawActivityChart();
+        }
+
+        function drawProgressChart() {
+            const canvas = document.getElementById('progressChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const courses = [
+                { name: 'Web Dev', progress: 75, color: '#3b82f6' },
+                { name: 'Data Science', progress: 45, color: '#10b981' },
+                { name: 'Mobile Dev', progress: 30, color: '#06b6d4' },
+                { name: 'UI/UX', progress: 60, color: '#8b5cf6' }
+            ];
+            
+            const barWidth = 60;
+            const spacing = 80;
+            const maxHeight = 200;
+            
+            courses.forEach((course, i) => {
+                const x = 50 + i * spacing;
+                const height = (course.progress / 100) * maxHeight;
+                const y = 250 - height;
+                
+                // Bar
+                ctx.fill
